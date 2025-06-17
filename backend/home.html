@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>War Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; }
+        #game-area { border: 1px solid #333; padding: 20px; margin-top: 20px; }
+        #messages { height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .player-info { display: flex; justify-content: space-between; }
+        .controls { margin-top: 10px; }
+        button { padding: 5px 10px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <h1>War Game</h1>
+    <div class="player-info">
+        <div>Status: <span id="status">Not connected</span></div>
+        <div>Players: <span id="player-count">0</span>/<span id="max-players">4</span></div>
+    </div>
+    
+    <div id="game-area" style="display: none;">
+        <div id="messages"></div>
+        <div class="controls">
+            <button id="join-red">Join Red Team</button>
+            <button id="join-blue">Join Blue Team</button>
+            <input type="text" id="message" placeholder="Command">
+            <button id="send">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080/ws');
+        let playerName = '';
+        
+        ws.onopen = () => {
+            console.log('Connected to game server');
+            document.getElementById('status').textContent = 'Connected';
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const messages = document.getElementById('messages');
+            const message = document.createElement('div');
+            
+            switch(data.type) {
+                case 'welcome':
+                    message.innerHTML = `<strong>Server:</strong> ${data.payload}`;
+                    document.getElementById('max-players').textContent = data.max;
+                    document.getElementById('player-count').textContent = data.players;
+                    document.getElementById('game-area').style.display = 'block';
+                    break;
+                    
+                case 'playerCount':
+                    document.getElementById('player-count').textContent = data.count;
+                    message.innerHTML = `<strong>Server:</strong> Players: ${data.count}/${data.max}`;
+                    break;
+                    
+                case 'gameStart':
+                    message.innerHTML = `<strong style="color:red;">GAME START:</strong> ${data.payload}`;
+                    break;
+                    
+                case 'move':
+                    message.innerHTML = `<strong>Player moved:</strong> ${data.payload}`;
+                    break;
+                    
+                case 'attack':
+                    message.innerHTML = `<strong style="color:red;">ATTACK:</strong> ${data.payload}`;
+                    break;
+                    
+                default:
+                    message.textContent = event.data;
+            }
+            
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
+        };
+        
+        ws.onclose = () => {
+            console.log('Disconnected from game server');
+            document.getElementById('status').textContent = 'Disconnected';
+            document.getElementById('game-area').style.display = 'none';
+        };
+        
+        // Button handlers
+        document.getElementById('join-red').addEventListener('click', () => {
+            playerName = 'Red Soldier ' + Math.floor(Math.random() * 100);
+            ws.send(JSON.stringify({ type: 'join', payload: playerName }));
+        });
+        
+        document.getElementById('join-blue').addEventListener('click', () => {
+            playerName = 'Blue Soldier ' + Math.floor(Math.random() * 100);
+            ws.send(JSON.stringify({ type: 'join', payload: playerName }));
+        });
+        
+        document.getElementById('send').addEventListener('click', () => {
+            const input = document.getElementById('message');
+            if (input.value.trim() !== '') {
+                ws.send(JSON.stringify({ type: input.value, payload: input.value }));
+                input.value = '';
+            }
+        });
+    </script>
+</body>
+</html>
